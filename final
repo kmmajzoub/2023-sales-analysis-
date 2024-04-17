@@ -1,0 +1,584 @@
+##############################################                  ##################################
+############################################## 2023 + outliers  ####################################
+##############################################      ANALYSIS    ####################################
+##############################################               ##############################################      
+##############################################            ##############################################      
+# describe my sales and my ad spending + what sales depends on  
+# predict sales with certain settings like ads and holidays
+# suggest strategies for increasing sales 
+
+
+setwd("C:/Users/LENOVO/Desktop/wonerlnad zarqa")
+getwd()
+#install.packages("googlesheets4")
+library('googlesheets4')
+allDataWl <- read_sheet('https://docs.google.com/spreadsheets/d/1YkLuPJlggrEHSduq2H_hdCvIeLbUSMF31ICW1CH-X-g/edit#gid=1088404486')
+2
+str(allDataWl)
+names(allDataWl)
+## will analyze 2023 
+wl2023 <- allDataWl[,c(19:36)]
+str(wl2023)
+## remove check nas
+anyNA(wl2023)
+sum(anyNA(wl2023))
+wl2023 <-  na.omit(wl2023)
+str(wl2023)
+# fix the formats
+wl2023$threshholds.2023 <- as.factor(wl2023$threshholds.2023)
+wl2023$weekend.weekdays.2023 <- as.factor(wl2023$weekend.weekdays.2023)
+wl2023$holiday.school.2023 <- as.factor(wl2023$holiday.school.2023)
+wl2023$weather.condition.2023 <- as.factor(wl2023$weather.condition.2023)
+# sales & threshhold is the target variable 
+# we have to predict 2024 threshold + identify the variable importance
+
+#######################################      ####################################### 
+####################################### EDA  ####################################### 
+#######################################      #######################################  
+
+########################## Univariate
+library(ggplot2)
+library(dplyr)
+########### Sales 
+hist(wl2023$Net.Sales.2023)
+# sales is skewed to the right 
+boxplot(wl2023$Net.Sales.2023)
+# outliers are known  
+sum(wl2023$Net.Sales.2023)
+summary(wl2023$Net.Sales.2023)
+# Min.   1st Qu.  Median    Mean 3rd Qu.  Max. 
+# 103.7   527.5  1190.6  1845.2  2306.1 25794.6
+sd(wl2023$Net.Sales.2023)
+#2611.389
+qplot(wl2023$threshholds.2023, main = 'season distrubution 2023', xlab = 'Season',ylab='Freq')
+#### holiday - schoolday
+table(wl2023$holiday.school.2023)
+qplot(wl2023$holiday.school.2023, main = 'holiday vs school', ylab='Freq')
+# Holiday School day 
+# 162        201 
+table(wl2023$weather.condition.2023)
+qplot(wl2023$weather.condition.2023, main = 'weather condition', ylab='Freq')
+# clear-day    partly-cloudy-day              rain 
+# 214               101                        48  
+# spending 
+summary(wl2023$total.marketing.2023)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.00    0.00    0.00   32.56    0.00 2544.46
+## we made a big mistake with the grand prize
+hist(wl2023$total.marketing.2023)
+sum(wl2023$total.marketing.2023)
+
+##########################  Bivariate 
+#Numarics
+# sales and marketing
+plot(wl2023$Net.Sales.2023,wl2023$total.marketing.2023,xlim = c(0,12000),ylim = c(0,3000), main="With Outliers", xlab="sales", ylab="marketing"
+     , pch="*",col="red", cex=2)
+abline(lm(Net.Sales.2023~total.marketing.2023,data=wl2023), col="blue")
+library(corrplot)
+cor(wl2023$Net.Sales.2023,wl2023$total.marketing.2023) # 62% correlation assuming no other variable
+cormatrix <- cor(wl2023[,c(2,15)])
+corrplot(cormatrix)
+#categorical 
+#threshold & holidays
+# outliers is always a holiday
+qplot(threshholds.2023,fill=holiday.school.2023,data = wl2023,geom="bar",
+      main="thresholds and holidays",
+      xlab = "thresholds",
+      ylab = "freq")# school days is always on the lower percentiles 
+qplot(threshholds.2023,fill=weather.condition.2023,data = wl2023,geom="bar",
+      main="thresholds and weather",
+      xlab = "thresholds",
+      ylab = "freq")
+#3 variables 
+#colored Dot 
+qplot(holiday.school.2023,total.marketing.2023,color=Net.Sales.2023,data = wl2023,
+      main="days and spend",
+      xlab = "holiday/school",
+      ylab = "total marketing")
+qplot(weather.condition.2023,total.marketing.2023,color=Net.Sales.2023,data = wl2023,
+      main="weather and spend",
+      xlab = "weather condition",
+      ylab = "total marketing")
+
+#######################################      ####################################### 
+################################# Business Statistics ############################ 
+#######################################      ####################################### 
+qplot(wl2023$threshholds.2023, main = 'season distrubution 2023', xlab = 'Season',ylab='Freq')
+##### hypotheseis testing
+#h0 : 
+#ha: sales is > 670 
+
+###################### ANOVA : the equality of the mean of several populations 
+## the anova analysis ( reject or accept null hypothesis)
+#sales & thresholds
+by(wl2023$Net.Sales.2023,INDICES = wl2023$threshholds.2023,FUN=mean)
+by(wl2023$Net.Sales.2023,INDICES = wl2023$threshholds.2023,FUN=var)
+hist(wl2023$Net.Sales.2023[wl2023$threshholds.2023=='High season'])
+hist(wl2023$Net.Sales.2023[wl2023$threshholds.2023=='outlier'])
+hist(wl2023$Net.Sales.2023[wl2023$threshholds.2023=='above mean'])
+hist(wl2023$Net.Sales.2023[wl2023$threshholds.2023=='Below mean'])
+hist(wl2023$Net.Sales.2023[wl2023$threshholds.2023=='low season'])
+#sales & weather
+by(wl2023$Net.Sales.2023,INDICES = wl2023$weather.condition.2023,FUN=mean)
+by(wl2023$Net.Sales.2023,INDICES = wl2023$weather.condition.2023,FUN=var)
+#sales & holidays
+by(wl2023$Net.Sales.2023,INDICES = wl2023$holiday.school.2023,FUN=mean)
+by(wl2023$Net.Sales.2023,INDICES = wl2023$holiday.school.2023,FUN=var)
+#a box plot of the sales for the function of the
+boxplot(wl2023$Net.Sales.2023~wl2023$holiday.school.2023,horizontal=TRUE,col=c("Red","Blue","Orange","Pink"))
+boxplot(wl2023$Net.Sales.2023~wl2023$threshholds.2023,horizontal=TRUE,col=c("Red","Blue","Orange","Pink"))
+boxplot(wl2023$Net.Sales.2023~wl2023$weather.condition.2023,horizontal=TRUE,col=c("Red","Blue","Orange","Pink"))
+## the anova analysis ( reject or accept null hypothesis) 
+# f statistic is the ratio between mean and sum 
+# p value is the probabilty we observe f statisitc bigger than what u observed 
+# the p value is very small so we will reject the null hypothesis
+################ multi-way anova
+# holiday and weather and marketing 
+salesModel <- aov(Net.Sales.2023~holiday.school.2023+weather.condition.2023+total.marketing.2023,data=wl2023)
+summary(salesModel) 
+# P vlue on holiday + marketign is very low so we are sure that price impact sales 
+TukeyHSD(golfModel) # t test for all means we have but we know both are totally different that is why zero 
+## p value for weather is below the 5% confidence level but less impact on the sales 
+interaction.plot(wl2023$weather.condition.2023,wl2023$holiday.school.2023,wl2023$Net.Sales.2023, col=c("Red","Blue"),main="Interaction between holidays and weather conditons")
+interaction.plot(wl2023$holiday.school.2023,wl2023$weather.condition.2023,wl2023$Net.Sales.2023, col=c("Red","Blue"),main="Interaction between holidays and weather conditons")
+interaction.plot(wl2023$total.marketing.2023,wl2023$holiday.school.2023,wl2023$Net.Sales.2023, col=c("Red","Blue"),main="Interaction between holidays and marketing")
+#ANOVA 
+anovaWl2023 <- wl2023
+## lets creae a model
+plant.mod1 <- lm(Net.Sales.2023~total.marketing.2023+holiday.school.2023+weather.condition.2023,data = anovaWl2023)
+#We  save  the  model  fitted  to  the  data  in  an  object  so  that  we  can  undertake  
+#various  actions  to study the goodness of the fit to the data and other model assumptions.
+#The standard summary of a lm object is used to produce the following output: 
+
+## the anova analysis ( reject or accept null hypothesis)
+anova(plant.mod1)
+## desplay actual analysis 
+summary(plant.mod1)
+#This table confirms that there are differences between the groups which were highlighted in 
+#the model summary. The functionconfint is used to calculate confidence intervals on the 
+#treatment parameters, by default 95% confidence intervals:
+## confiedence interval
+confint(plant.mod1)
+
+
+#######################################      ####################################### 
+################################# machine learning ############################ 
+#######################################      ####################################### 
+
+####################### hierarchical Clustering 
+#clustering is used in market segment analysis , search reuslts and entroders.
+# we can use it in our customers data base, if we have preferences for each customer 
+hcWl2023 <- wl2023
+str(hcWl2023)
+names(hcWl2023)
+distMatrix <- dist(hcWl2023[,c(2,15)], method = 'euclidean') # is the distance measure 
+distMatrix <- dist(hcWl2023[,c(2,15)], method = 'minkowski',p=2) # this is like the eculidean distance 
+## another methods like ....
+print(distMatrix)
+## the distance is dominated by the avg ssales because it is in 1000sds so we will scale
+hcWl2023.scaled <- scale(hcWl2023[,c(2,15)])
+print(hcWl2023.scaled)
+distMatrix.scale <- dist(hcWl2023.scaled, method = 'euclidean')
+distMatrix.scale
+## lets make hirarchial clustering now 
+?hclust
+cluster <- hclust(distMatrix.scale,method = 'average')
+#plot(cluster, labels = as.character(hcWl2023[,3])) ## putting the thresholds colm as labels 
+plot(cluster)
+cluster$height
+## add borders and make groups of clusters
+rect.hclust(cluster,k=5,border='red')
+## will avg each clusters so to understand each group 
+# we will add a new col upon the ks
+hcWl2023$cluster <- cutree(cluster,k=5)
+print(hcWl2023)
+summary(hcWl2023$cluster)
+# now we will give each prfile an avg 
+custProfile <- aggregate(hcWl2023[,c(2,15)], list(hcWl2023$cluster),FUN = 'mean')
+custProfile
+
+############################# K means clustering 
+kmWl2023 <- wl2023
+kmWl2023.scaled <- scale(kmWl2023[,c(2,15)])
+print(kmWl2023.scaled)
+seed <- 1
+set.seed(seed)
+clust3 <- kmeans(x=kmWl2023.scaled, centers = 3, nstart = 5) # nstart like 5 then this experemint will be done 5 times
+print(clust3)
+## each row was divided upon its cluster 
+## each of the 3 clusters within sum of squares 
+
+## to plot the clusters in kmeans 
+library(cluster)
+clusplot(kmWl2023.scaled,clust3$cluster,color = TRUE,shade = TRUE,labels = 2,lines = 1)
+#### how many clusters we have to use and to find the right number of lcutsters 
+totWss <- rep(0,5) # total witjin squares 
+for(k in 1:10){
+  set.seed(seed)
+  clust <- kmeans(x=kmWl2023.scaled, centers = k, nstart = 5)
+  totWss[k]=clust$tot.withinss
+}
+print(totWss) # the clusters and ts sum of squares untill it reacha zero
+plot(c(1:10),totWss,type = 'b')
+# 4 clusters 
+clust4 <- kmeans(x=kmWl2023.scaled, centers = 4, nstart = 5)
+clusplot(kmWl2023.scaled,clust4$cluster,color = TRUE,shade = TRUE,labels = 2,lines = 1)
+### ther is a package that is more sophisticated to show the optimum numbeer of clusters
+## it makes experemint and send the best number from the rsults
+library(NbClust)
+set.seed(seed)
+## you can send the actual data it will scall it by itself and take of the unwanted colm
+nc <- NbClust(kmWl2023[,c(2,15)],min.nc=2,max.nc=50,method = 'kmeans')
+nc
+nc$Best.nc
+## nc suggest 2 clusters
+clust2 <- kmeans(x=kmWl2023.scaled, centers = 2, nstart = 5)
+print(clust2)
+par(mfrow=c(1,1))
+clusplot(kmWl2023.scaled,clust2$cluster,color = TRUE,shade = TRUE,labels = 2,lines = 1)
+### now i will add a new colm of the clusters
+kmWl2023$cluster <- clust3$cluster
+kmWl2023
+# now prfile the clusters and group them 
+custProfile <- aggregate(kmWl2023[,c(2,15)],list(kmWl2023$cluster), FUN = 'mean')
+custProfile
+
+###################################################Clustering2
+#Calculate Gower distance
+kmWl2023 <- wl2023
+gower_dist<-daisy(kmWl2023.scaled,metric = "gower")
+gower_dist
+plot(gower_dist)
+#Calculate the optimum number of clusters to be created , using the elbow method
+library(factoextra)
+fviz_nbclust(kmWl2023.scaled,pam,method = "wss",diss=gower_dist)+geom_vline(xintercept = 6, linetype = 2)+labs(subtitle = "Elbow method")
+# 6 is the optimumm number of clusters suggested as per this method
+pam_fit_6 <- pam(gower_dist, diss = TRUE, k = 6)
+# profiling the clusters
+library(do)
+pam_results_6 <- kmWl2023 %>%
+  mutate(cluster_id = pam_fit_6$clustering) %>%
+  group_by(cluster_id) %>%
+  do(overall_summary = summary(.))
+pam_results_4$overall_summary
+#Plot the clusters
+library(Rtsne)
+tsne_obj_6 <- Rtsne(gower_dist, is_distance = TRUE)
+tsne_data_6 <- tsne_obj_6$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit_6$clustering))
+ggplot(aes(x = X, y = Y), data = tsne_data_6) +
+  geom_point(aes(color = cluster))
+
+############################## "CART"
+CARTwl2023 <- wl2023
+nrow(CARTwl2023)
+summary(CARTwl2023$threshholds.2023)
+sum(CARTwl2023$threshholds.2023=='High season')/nrow(CARTwl2023) # 17%
+sum(CARTwl2023$threshholds.2023=='outlier')/nrow(CARTwl2023) # 4%
+sum(CARTwl2023$threshholds.2023=='above mean')/nrow(CARTwl2023) # 22%
+sum(CARTwl2023$threshholds.2023=='Below mean')/nrow(CARTwl2023) # 42%
+sum(CARTwl2023$threshholds.2023=='low season')/nrow(CARTwl2023) #13%
+plot(CARTwl2023$Net.Sales.2023,CARTwl2023$total.marketing.2023)
+## color the thresholds
+points(CARTwl2023$Net.Sales.2023[CARTwl2023$threshholds.2023=='High season'],CARTwl2023$total.marketing.2023[CARTwl2023$threshholds.2023=='High season'], col='green',pch=19)
+points(CARTwl2023$Net.Sales.2023[CARTwl2023$threshholds.2023=='outlier'],CARTwl2023$total.marketing.2023[CARTwl2023$threshholds.2023=='outlier'], col='yellow',pch=19)
+points(CARTwl2023$Net.Sales.2023[CARTwl2023$threshholds.2023=='above mean'],CARTwl2023$total.marketing.2023[CARTwl2023$threshholds.2023=='above mean'], col='purple',pch=19)
+points(CARTwl2023$Net.Sales.2023[CARTwl2023$threshholds.2023=='Below mean'],CARTwl2023$total.marketing.2023[CARTwl2023$threshholds.2023=='Below mean'], col='grey',pch=19)
+points(CARTwl2023$Net.Sales.2023[CARTwl2023$threshholds.2023=='low season'],CARTwl2023$total.marketing.2023[CARTwl2023$threshholds.2023=='low season'], col='blue',pch=19)
+## r pat to create carts + rprart plot
+library(rpart)
+library(rpart.plot)
+tree <- rpart(formula = threshholds.2023~.,data = CARTwl2023[,c(3,15,16,17,18)],method = 'class', minbucket =3 , cp = 0)
+tree
+rpart.plot(tree)
+## above has complexity parameter of zero we need it more simple so we print the cp
+printcp(tree)
+## this shows the lowest xerror at split 8 where the cp = 
+plotcp(tree)
+pruneTree <- prune(tree,cp=0.009,'CP')
+printcp(pruneTree)
+rpart.plot(pruneTree)
+## show the path 
+path.rpart(pruneTree,c(1:7))
+#### we want to sgment the trees and path on the plots graph 
+#plot(wl2023$total.marketing.2023 ,wl2023$) 
+#points(trainDS$X1[trainDS$Y=='Good'],trainDS$X2[trainDS$Y=='Good'], col='blue',pch=19)
+#points(trainDS$X1[trainDS$Y=='Bad'],trainDS$X2[trainDS$Y=='Bad'], col='red',pch=19)
+## now we start prediction 
+CARTwl2023$prediction <- predict(pruneTree,data=CARTwl2023,type ='class') ## here it is a classification 
+CARTwl2023$score <- predict(pruneTree,data=CARTwl2023,type ='prob') ## here it is the probability
+View(CARTwl2023)
+## hesr it give us the probaility for each threshold and upon the highest score it makes the prediction 
+
+########################### for CART go back to 555 to 630 a good model is made
+############################ another cart model on 864 to 1002
+
+####################################### Random Forest
+rfWl2023 <- wl2023
+library(randomForest)
+set.seed(1000)
+#net sales
+names(rfWl2023)
+rndForest <- randomForest(Net.Sales.2023 ~ ., data = rfWl2023[,c(2,15,17,18)], ntree=501, mtry=3,nodsieze =20, importance= TRUE)
+print(rndForest)
+## OOB is out of bag errors
+plot(rndForest)
+## this shows after 90 forest there is no change in the error rate
+importance(rndForest)
+## meanDecreaseAccuracy the larger the number the importance increase + Gini 
+### in the tune rf x takes all the independant variables and Y the dependant whichis target on col 2
+TunedRndForest <- tuneRF(x= rfWl2023[,c(15,17,18)],y=rfWl2023$threshholds.2023,mtryStart = 3,stepFactor = 1.5, ntreeTry = 91,improve = 0.1,
+                         nodesize=10,trace = TRUE,  plot = TRUE,doBest = TRUE,importance= TRUE)
+## create new variable predicted class
+rfWl2023$predict.class <- predict(TunedRndForest,rfWl2023,type='class')
+rfWl2023$prob1 <- predict(TunedRndForest,rfWl2023,type='prob')
+View(rfWl2023)
+#table to compare predicted with real target 
+tbl <- table(rfWl2023$threshholds.2023,rfWl2023$predict.class)
+tbl
+## error rate is equal to 10%
+print((tbl[1,2]+tbl[2,1])/363)
+#### now on the quantiles 
+qs <- quantile(rfWl2023$prob1,prob=seq(0,1,length=11))
+qs
+## the last 90-100% takes the major prob , even the 90% is low which is 18% so will focus on the top10%
+threshold <- qs[10]
+threshold
+#mean(rfWl2023$threshholds.2023[rfWl2023$prob1>threshold] == 'High season') ## it is catagrocial mean wont work 
+## Variable importance
+library(caret)
+fit = randomForest(Net.Sales.2023 ~ ., rfWl2023[,c(2,15,17,18)])
+fit = randomForest(threshholds.2023 ~ ., rfWl2023[,c(3,15,17,18)])
+varImp(fit)
+### Plot results
+varImpPlot(fit,type=2)
+##  Build Logit Models and Predict
+#names(trainingData)
+logitMod <- glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=rfWl2023[,c(3,15,17,18)], family=binomial(link="logit"))
+predicted <- plogis(predict(logitMod, rfWl2023))  # predicted scores
+predicted
+
+#thershold 
+rfWl2023 <- wl2023
+names(rfWl2023)
+rndForest <- randomForest(threshholds.2023 ~ ., data = rfWl2023[,c(3,15,17,18)], ntree=501, mtry=3,nodsieze =10, importance= TRUE)
+print(rndForest)
+## OOB is out of bag errors
+plot(rndForest)
+## this shows after 90 forest there is no change in the error rate
+importance(rndForest)
+## meanDecreaseAccuracy the larger the number the importance increase + Gini 
+### in the tune rf x takes all the independant variables and Y the dependant whichis target on col 2
+TunedRndForest <- tuneRF(x= rfWl2023[,c(15,17,18)],y=rfWl2023$threshholds.2023,mtryStart = 5,stepFactor = 1.5, ntreeTry = 91,improve = 0.001,
+                         nodesize=10,trace = TRUE,  plot = TRUE,doBest = TRUE,importance= TRUE)
+## create new variable predicted class
+rfWl2023$predict.class <- predict(TunedRndForest,rfWl2023,type='class')
+rfWl2023$prob1 <- predict(TunedRndForest,rfWl2023,type='prob')
+View(rfWl2023)
+#table to compare predicted with real target 
+tbl <- table(rfWl2023$threshholds.2023,rfWl2023$predict.class)
+tbl
+## error rate
+print((tbl[1,2]+tbl[2,1])/363)
+#### now on the quantiles 
+qs <- quantile(rfWl2023$prob1,prob=seq(0,1,length=11))
+qs
+## the last 90-100% takes the major prob , even the 90% is low which is 18% so will focus on the top10%
+threshold <- qs[10]
+#mean(rfWl2023$threshholds.2023[rfWl2023$prob1>threshold] == 'D High season') ## it is catagrocial mean wont work 
+## Variable importance
+library(caret)
+fit = randomForest(Net.Sales.2023 ~ ., rfWl2023[,c(2,15,17,18)])
+fit = randomForest(threshholds.2023 ~ ., rfWl2023[,c(3,15,17,18)])
+varImp(fit)
+### Plot results
+varImpPlot(fit,type=2)
+##  Build Logit Models and Predict
+#names(trainingData)
+logitMod <- glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=rfWl2023[,c(3,15,17,18)], family=binomial(link="logit"))
+predicted <- plogis(predict(logitMod, rfWl2023))  # predicted scores
+predicted
+
+
+
+#### there is another model you can check on 1002 to 1126 
+
+####################### CHAID ########### Only for catagorical variables 
+chaidWl2023 <- wl2023
+names(chaidWl2023)
+str(chaidWl2023)
+## we willtest the groups in the table and check if there is a difference betwen them 
+#the lower the P value we can reject the null is not different 
+# are the groups statstclly different from one another or is it by chance they are different 
+chisq.test(chaidWl2023[,c(2,5:14)])
+# the p vale is very low so variables are different 
+## we can test different variables
+tab <- table(chaidWl2023$total.marketing.2023,chaidWl2023$threshholds.2023)
+chisq.test(tab)
+tab <- table(chaidWl2023$weather.condition.2023,chaidWl2023$threshholds.2023)
+chisq.test(tab)
+tab <- table(chaidWl2023$holiday.school.2023,chaidWl2023$threshholds.2023)
+chisq.test(tab)
+## this library it builds a tree 
+library(CHAID)
+chaid.control <- chaid_control(minbucket = 30,minsplit = 10,alpha2 = .05,alpha4 = .05)
+tree <- chaid(threshholds.2023~holiday.school.2023, data= chaidWl2023, control = chaid.control)  
+plot(tree)
+print(tree)
+tree <- chaid(threshholds.2023~weather.condition.2023+holiday.school.2023, data= chaidWl2023, control = chaid.control)  
+plot(tree)
+###################################### there is a full 3 models on 716 to 801
+
+#######################################      ####################################### 
+################################# predictive modeling  ############################ 
+#######################################      ####################################### 
+
+# lets take a quick regression wlak through of thisc dataset and see what a regression modeling exercise from our perspective 
+# we can add price and plot it 
+
+
+predictWl2023 <- wl2023
+names(predictWl2023)
+library(ggplot2)
+library(grid)
+# linear regression 
+lm(predictWl2023$Net.Sales.2023~predictWl2023$total.marketing.2023) # linear model 
+# sales is wqual to 1455  marketing is 6.288 
+plot(predictWl2023$Net.Sales.2023~predictWl2023$total.marketing.2023)
+abline(1455.958,6.288) # the line goes though the data set and is the best line that minimize the ss errors of all the 364 point 
+# each of these points find the distance between and the line square and sum it , make it forr all the lines and pick the line that the ss is the smallets 
+# that is alogherthim we are using 
+# this equation means for every 1 unit increase in makreting 6.288 increase in sales will occur 
+# how good is this fit :
+summary(lm(predictWl2023$Net.Sales.2023~predictWl2023$total.marketing.2023))
+log(6.2876)
+# error is 0.412 sd is 15.26 and pr is almost zero so this is a significant variable  
+# rsquared is .39 so 40% of the variability is marketing 
+summary(lm(predictWl2023$Net.Sales.2023~predictWl2023$holiday.school.2023))
+#lm(log(predictWl2023$Net.Sales.2023[predictWl2023$Net.Sales.2023>0])~log(predictWl2023$holiday.school.2023[predictWl2023$Net.Sales.2023>0]))
+log(1940.1)
+# for ec=very extra school day more u sell less 1940 sales unit r square is 13% 
+### Apply Multiple Linear Regression
+lm.sales <- lm(Net.Sales.2023 ~ . , data=predictWl2023[,c(2,15,17,18)])
+#### Define a Model Performance Metric
+#We will calculate the coefficient of determination, R^2, to quantify our model's performance.
+#The coefficient of determination for a model is useful statistic in regression analysis,
+#as it often describes how **good** that model is at making predictions.
+#We print the summary of the object MEDV.lm to get this metric.
+lm.sales
+summary(lm.sales)
+# this is 47% fot he data marketing is now 5.825 sig + school is -1406 + rain is 561  
+# marketing is 14.912 sd so it is the most important  
+#### RESIDUALS 
+predict(lm.sales)[1] #2395.29
+residuals(lm.sales)[1] #904.8949
+predictWl2023$Net.Sales.2023[1]#3300.185
+plot(predictWl2023$Net.Sales.2023,predict(lm.sales))
+cor(predictWl2023$Net.Sales.2023,predict(lm.sales))^2 #46% 
+hist(residuals(lm.sales))
+summary(lm.sales)
+# we have an error of 1907 jod error in prediction 
+
+library(car) # use for multicollinearity test (i.e. Variance Inflation Factor(VIF))
+library(MASS) # use for basic statistics
+library(dummy) # use for dummy variable transformation(i.e. One-Hot Encoding)
+library(ggplot2) # use for visualisation
+library(caret) # use for LM model training
+#3. Q-Q plot for normality
+qqnorm(predictWl2023$Net.Sales.2023) 
+# All the points seem to fall about a straight line with little skewed on the right side. 
+# graphically, It looks slightly normal distribution. But, let's test the normality quantitatively. 
+# 4. Model Building 
+# Develop the first model 
+model_1 <-lm(Net.Sales.2023 ~ . , data=predictWl2023[,c(2,15,17,18)])
+summary(model_1)
+vif(model_1) # variance inflation factor
+# if it is higher than 5 
+# us it is all below 2 it means that marketing + holiday + weather are picking a different aspect and not related to each other 
+names(predictWl2023)
+# Applying stepwise method for variable reduction
+model_4 <- stepAIC(model_1, direction="both",k=5)
+# In General, stepAIC chooses the best model based on AIC(Akaike information criterion), It is very useful for high-dimensional data containing multiple predictor variables. 
+# K is used for setting up the p-value criteria for selecting significant variables,
+# Test this model to the test dataset.
+
+
+####### Calssification methods
+######1. logisitc regression ### 1. convert Y to continus number between 0and 1 2. scalling it using the odds ration the log odds ratio 3. 
+###################################2. Discrement Analysis 
+#######################################3. naive bays 
+##############################################4. K nearest neighbour 
+?glm
+glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=predictWl2023,family="binomial") # genrlazied linear model - it is minus which means the higher the credit score the more the defaults 
+# here above R considered 1 is default and it should be non default  , and we are aiming for default
+# 2 options to fix this 1- minus 2- or we can label the variables comes alpha numercly after the non default unit 
+summary(glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=wl2023,family="binomial")) # pvalue test if the variable is significant and it is less than 5%
+vif(glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=wl2023,family="binomial")) # pvalue test if the variable is significant and it is less than 5%
+help(family)
+#  p value as linear marketing is sig and holiday - weather is not - 
+library(rms)
+library(caTools)
+library(car)
+vif(glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=predictWl2023,family="binomial")) 
+# VIF is more than 5 so it is a concern 
+## 2 variables will cancel each other so remove one of them 
+logistic.Status <- glm(threshholds.2023~total.marketing.2023+weather.condition.2023+holiday.school.2023,data=predictWl2023,family="binomial")
+logistic.Status
+exp(0.3583)### this means for every extra year work exper the odds of non default will go down by 43%
+logistic.Status$fitted.values ## to get the probabilities 
+plot(predictWl2023$threshholds.2023,logistic.Status$fitted.values)
+plot(predictWl2023$Net.Sales.2023,logistic.Status$fitted.values)
+#color it 
+Status.predicted=ifelse(logistic.Status$fitted.values<0.95,"Default","No")
+table(predictWl2023$threshholds.2023,Status.predicted)
+summary(predictWl2023$threshholds.2023)
+library(pROC)
+roc(predictWl2023$threshholds.2023,logistic.Status$fitted.values)
+plot.roc(predictWl2023$threshholds.2023,logistic.Status$fitted.values)
+
+##################### NAIVE BAYES ## is applies when the xs is catgorical and the ys is catogrical 
+naiveWl2023 <- wl2023
+library(e1071)
+help(naiveBayes)
+naiveBayes(threshholds.2023~weather.condition.2023+holiday.school.2023+total.marketing.2023,data=naiveWl2023)
+NB.Status=naiveBayes(threshholds.2023~weather.condition.2023+holiday.school.2023+total.marketing.2023,data=naiveWl2023)## create an object 
+# this table mean the condition distrubition work exp given default is a distrubution that has a mean 7.47 and sd 4.42
+predict(NB.Status,type="raw",newdata=naiveWl2023) # after creating the object we predict it # type raw means , a col of 2 postirior probabilities 
+plot(naiveWl2023$threshholds.2023,predict(NB.Status,type="raw",newdata=naiveWl2023)) # postirior prob is on the sec colm
+predict(NB.Status,newdata=naiveWl2023)
+
+#conclusions:
+################################## we have to  bins threshold with holidays and school days 
+################################# we have to bins thresholds with weekends 
+################################# we have to bins thresholds with national holidays
+################################# we have to bins thresholds with weather condition 
+################################# brand marketing must be spreaded on the whole year 
+################################# we can add the price as well high and low store size and we can adv spend 
+################################ 
+# we cn add shlevloc + competitores + price +
+# we will add games + cards + inshalah crm + ads in depth 
+
+
+
+names(predictWl2023)
+
+
+#
+
+#######################################3# without the outliers
+wl_2023_without <- filter(wl2023,!grepl('outlier', wl2023$threshholds.2023))
+qplot(wl_2023_without$threshholds.2023, main = 'thresholds distrubution 2023', xlab = 'Season',ylab='Freq')
+boxplot(wl_2023_without$Net.Sales.2023)
+summary(wl_2023_without$Net.Sales.2023)
+# Min.   1st Qu.  Median  Mean   3rd Qu.  Max. 
+# 103.7   514.4  1069.9  1423.1  2133.6  4730.4
+sd(wl_2023_without$Net.Sales.2023)
+#1072.277
+# Low Season 0 <x< 349 
+# Below Mean       350 < x < 1424
+# Above Mean                 1425 < x < 2499
+# High Season                           2500 < x < 4730
+
+
